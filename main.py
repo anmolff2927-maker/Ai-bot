@@ -31,12 +31,15 @@ async def handle_message(update, context):
     user_message = update.message.text
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-3.8-flash',
             contents=user_message,
         )
         await update.message.reply_text(response.text)
     except Exception as e:
-        await update.message.reply_text(f"Error details: {str(e)}")
+        if "503" in str(e) or "UNAVAILABLE" in str(e):
+            await update.message.reply_text("Bhai, server abhi thoda busy hai. Ek baar fir se message bhej!")
+        else:
+            await update.message.reply_text(f"Error details: {str(e)}")
 
 def main():
     TOKEN = os.environ.get("BOT_TOKEN")
