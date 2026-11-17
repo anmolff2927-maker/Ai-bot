@@ -1,7 +1,7 @@
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
-from telegram.ext import ApplicationBuilder, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters
 from google import genai
 
 # Render ke liye dummy web server taki port error na aaye
@@ -20,24 +20,32 @@ def run_server():
 threading.Thread(target=run_server, daemon=True).start()
 
 # Gemini client setup
-gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
+# /start command ka handler
+async def start(update, context):
+    await update.message.reply_text("Namaste! Main Xyren AI hoon. Aap mujhse kuch bhi pooch sakte hain!")
+
+# Text messages (Gemini AI) ka handler
 async def handle_message(update, context):
     user_message = update.message.text
     try:
-        # Gemini se response lena
-        response = gemini_client.models.generate_content(
+        response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=user_message,
         )
         await update.message.reply_text(response.text)
     except Exception as e:
-        await update.message.reply_text("Bhai, kuch error aa gaya hai API call mein!")
+        await update.message.reply_text(f"Error details: {str(e)}")
 
 def main():
     TOKEN = os.environ.get("BOT_TOKEN")
     app = ApplicationBuilder().token(TOKEN).build()
+    
+    # Handlers add karna
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
     app.run_polling()
 
 if __name__ == "__main__":
