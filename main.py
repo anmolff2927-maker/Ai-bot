@@ -1,36 +1,34 @@
 import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from google import genai
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+from telegram.ext import ApplicationBuilder, MessageHandler, filters
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Render ke liye dummy web server taki port error na aaye
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+def run_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
+    server.serve_forever()
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Namaste bhai! Main tera AI chatbot hoon.\nKuch bhi poochh, main jawab dunga.")
+# Server ko alag thread mein chalayein
+threading.Thread(target=run_server, daemon=True).start()
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text
-
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=user_message
-        )
-        await update.message.reply_text(response.text)
-    except Exception as e:
-        await update.message.reply_text("Sorry yaar, thodi problem aa gayi. Phir se try kar.")
+async def echo(update, context):
+    text = update.message.text
+    # Yahan apni Gemini API call lagayein jo pehle likhi thi
+    await update.message.reply_text(f"Aapne kaha: {text}")
 
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    print("Bot start ho gaya...")
+    TOKEN = os.environ.get("BOT_TOKEN")
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     app.run_polling()
 
 if __name__ == "__main__":
     main()
+    
