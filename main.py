@@ -30,9 +30,8 @@ async def start(update, context):
 async def handle_message(update, context):
     user_message = update.message.text
     try:
-        # Stable model use kar rahe hain
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.0-flash',
             contents=user_message,
         )
         await update.message.reply_text(response.text)
