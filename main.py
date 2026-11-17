@@ -1,56 +1,36 @@
 import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from google import genai
 
-# Render ke liye dummy web server taki port error na aaye
-class SimpleHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is alive!")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-def run_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
-    server.serve_forever()
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-# Server ko alag thread mein chalayein
-threading.Thread(target=run_server, daemon=True).start()
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Namaste bhai! Main tera AI chatbot hoon.\nKuch bhi poochh, main jawab dunga.")
 
-# Gemini client setup
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-
-# /start command ka handler
-async def start(update, context):
-    await update.message.reply_text("Namaste! Main Xyren AI hoon. Aap mujhse kuch bhi pooch sakte hain!")
-
-# Text messages (Gemini AI) ka handler
-async def handle_message(update, context):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
+
     try:
         response = client.models.generate_content(
-            model='gemini-3.8-flash',
-            contents=user_message,
+            model="gemini-flash-latest",
+            contents=user_message
         )
         await update.message.reply_text(response.text)
     except Exception as e:
-        if "503" in str(e) or "UNAVAILABLE" in str(e):
-            await update.message.reply_text("Bhai, server abhi thoda busy hai. Ek baar fir se message bhej!")
-        else:
-            await update.message.reply_text(f"Error details: {str(e)}")
+        await update.message.reply_text("Sorry yaar, thodi problem aa gayi. Phir se try kar.")
 
 def main():
-    TOKEN = os.environ.get("BOT_TOKEN")
-    app = ApplicationBuilder().token(TOKEN).build()
-    
-    # Handlers add karna
+    app = Application.builder().token(BOT_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
+    app.add_handler(MessageHandler(filters.TEXT & \~filters.COMMAND, handle_message))
+
+    print("Bot start ho gaya...")
     app.run_polling()
 
 if __name__ == "__main__":
     main()
-    
