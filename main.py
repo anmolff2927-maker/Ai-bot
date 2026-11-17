@@ -1,36 +1,57 @@
 import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from google import genai
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters
+from openai import OpenAI
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Render ke liye dummy web server taki port error na aaye
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+def run_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
+    server.serve_forever()
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Namaste bhai! Main tera AI chatbot hoon.\nKuch bhi poochh, main jawab dunga.")
+# Server ko alag thread mein chalayein
+threading.Thread(target=run_server, daemon=True).start()
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# OpenAI client setup (OpenAI API key env variable se uthayega)
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+# /start command ka handler
+async def start(update, context):
+    await update.message.reply_text("Namaste! Main Xyren AI hoon (Powered by ChatGPT). Aap mujhse kuch bhi pooch sakte hain!")
+
+# Text messages (ChatGPT AI) ka handler
+async def handle_message(update, context):
     user_message = update.message.text
-
     try:
-        response = client.models.generate_content(
-            model="gemini-flash-latest",
-            contents=user_message
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": user_message}
+            ]
         )
-        await update.message.reply_text(response.text)
+        reply_text = response.choices[0].message.content
+        await update.message.reply_text(reply_text)
     except Exception as e:
-        await update.message.reply_text("Sorry yaar, thodi problem aa gayi. Phir se try kar.")
+        await update.message.reply_text(f"Error details: {str(e)}")
 
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-
+    TOKEN = os.environ.get("BOT_TOKEN")
+    app = ApplicationBuilder().token(TOKEN).build()
+    
+    # Handlers add karna
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & \~filters.COMMAND, handle_message))
-
-    print("Bot start ho gaya...")
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
     app.run_polling()
 
 if __name__ == "__main__":
     main()
+    
