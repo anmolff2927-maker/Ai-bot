@@ -30,17 +30,14 @@ async def start(update, context):
 async def handle_message(update, context):
     user_message = update.message.text
     try:
+        # Stable model use kar rahe hain
         response = client.models.generate_content(
-            model='gemini-3.8-flash',
+            model='gemini-1.5-flash',
             contents=user_message,
         )
         await update.message.reply_text(response.text)
     except Exception as e:
-        # Agar server busy ho ya 503 error aaye
-        if "503" in str(e) or "UNAVAILABLE" in str(e):
-            await update.message.reply_text("Bhai, abhi Google server par bohot zyada load hai (High Demand). Thodi der baad try kar, theek ho jayega!")
-        else:
-            await update.message.reply_text(f"Error aa gaya hai: {str(e)}")
+        await update.message.reply_text(f"Error details: {str(e)}")
 
 def main():
     TOKEN = os.environ.get("BOT_TOKEN")
